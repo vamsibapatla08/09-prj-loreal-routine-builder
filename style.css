@@ -337,3 +337,187 @@ body {
 .generate-btn i {
   margin-right: 8px;
 }
+
+/* Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+}
+
+.modal.active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+}
+
+.modal-content {
+  position: relative;
+  background: #fff;
+  border-radius: 8px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  padding: 30px;
+}
+
+.modal-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #000;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+  z-index: 1001;
+}
+
+.modal-close:hover {
+  color: #666;
+}
+
+.modal-close:focus {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+
+.modal-body {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.modal-product-image {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.modal-product-info {
+  flex: 1;
+}
+
+.modal-product-info h2 {
+  font-size: 22px;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.modal-brand {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+
+.modal-description {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #333;
+}
+
+/* Responsive modal for smaller screens */
+@media (max-width: 600px) {
+  .modal-body {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .modal-product-image {
+    width: 120px;
+    height: 120px;
+  }
+
+  .modal-content {
+    padding: 20px;
+  }
+
+  .modal-product-info h2 {
+    font-size: 18px;
+  }
+}
+
+/* Chat message styles */
+.chat-message {
+  padding: 16px;
+  margin: 8px 0;
+  border-radius: 6px;
+  line-height: 1.6;
+}
+
+.chat-message.routine {
+  background: #f9f9f9;
+  border-left: 4px solid #000;
+}
+
+.chat-message.routine h3 {
+  font-size: 18px;
+  margin-bottom: 12px;
+  color: #000;
+}
+
+.routine-content {
+  font-size: 14px;
+  color: #333;
+}
+
+.routine-content li {
+  margin-left: 20px;
+  margin-bottom: 6px;
+}
+
+.routine-content p {
+  margin-bottom: 8px;
+}
+
+.routine-content h1,
+.routine-content h2,
+.routine-content h3,
+.routine-content h4,
+.routine-content h5,
+.routine-content h6 {
+  color: #000;
+  font-weight: 700;
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
+.chat-message.error {
+  background: #ffe6e6;
+  border-left: 4px solid #d32f2f;
+  color: #c62828;
+}
+
+.chat-message.loading {
+  background: #e3f2fd;
+  border-left: 4px solid #1976d2;
+  color: #1565c0;
+  text-align: center;
+}
+
+.chat-message.loading i {
+  margin-right: 8px;
+}
