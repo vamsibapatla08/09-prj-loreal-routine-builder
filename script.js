@@ -1,15 +1,47 @@
 /* Get references to DOM elements */
 const categoryFilter = document.getElementById("categoryFilter");
+const productSearch = document.getElementById("productSearch");
 const productsContainer = document.getElementById("productsContainer");
 const selectedProductsList = document.getElementById("selectedProductsList");
 const generateRoutineButton = document.getElementById("generateRoutine");
 const chatForm = document.getElementById("chatForm");
 const chatWindow = document.getElementById("chatWindow");
 
+/* Language and RTL elements */
+const htmlElement = document.getElementById("htmlElement");
+const enLangBtn = document.getElementById("enLangBtn");
+const arLangBtn = document.getElementById("arLangBtn");
+
+/* Helper function to set language and direction */
+function setLanguage(lang) {
+  const isRTL = lang === "ar";
+
+  /* Update HTML element */
+  htmlElement.lang = lang;
+  htmlElement.dir = isRTL ? "rtl" : "ltr";
+
+  /* Update button states */
+  if (lang === "en") {
+    enLangBtn.classList.add("active");
+    arLangBtn.classList.remove("active");
+  } else {
+    enLangBtn.classList.remove("active");
+    arLangBtn.classList.add("active");
+  }
+
+  /* Save preference to localStorage */
+  localStorage.setItem("preferredLanguage", lang);
+}
+
 /* Modal elements */
 const productModal = document.getElementById("productModal");
 const modalClose = document.querySelector(".modal-close");
 const modalBackdrop = document.querySelector(".modal-backdrop");
+
+/* Confirmation modal elements */
+const confirmationModal = document.getElementById("confirmationModal");
+const confirmYesBtn = document.getElementById("confirmYesBtn");
+const confirmNoBtn = document.getElementById("confirmNoBtn");
 
 /* Helper function to open product details modal */
 function openProductModal(product) {
@@ -31,10 +63,78 @@ function closeProductModal() {
   document.body.style.overflow = "auto";
 }
 
+/* Helper function to open confirmation modal */
+function openConfirmationModal() {
+  confirmationModal.classList.add("active");
+  confirmationModal.setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+}
+
+/* Helper function to close confirmation modal */
+function closeConfirmationModal() {
+  confirmationModal.classList.remove("active");
+  confirmationModal.setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "auto";
+}
+
 let allProducts = [];
 let currentProducts = [];
 let selectedProductIds = [];
 let hasCategorySelection = false;
+let conversationHistory = [];
+let routineGenerated = false;
+let currentSearchQuery = "";
+let currentCategory = "";
+
+/* localStorage key for saving selected products */
+const STORAGE_KEY = "selectedProductIds";
+
+/* Helper functions for localStorage management */
+function saveSelectedProductsToStorage() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedProductIds));
+}
+
+function loadSelectedProductsFromStorage() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    selectedProductIds = JSON.parse(saved);
+  }
+}
+
+function clearAllSelectedProducts() {
+  selectedProductIds = [];
+  saveSelectedProductsToStorage();
+  renderCurrentProducts();
+}
+
+/* Helper function to filter products based on category and search query */
+async function applyFilters() {
+  const products = await loadProducts();
+
+  let filteredProducts = products;
+
+  /* Apply category filter */
+  if (currentCategory) {
+    filteredProducts = filteredProducts.filter(
+      (product) => product.category === currentCategory,
+    );
+  }
+
+  /* Apply search filter */
+  if (currentSearchQuery.trim()) {
+    const query = currentSearchQuery.toLowerCase();
+    filteredProducts = filteredProducts.filter(
+      (product) =>
+        product.name.toLowerCase().includes(query) ||
+        product.brand.toLowerCase().includes(query) ||
+        product.description.toLowerCase().includes(query) ||
+        product.category.toLowerCase().includes(query),
+    );
+  }
+
+  displayProducts(filteredProducts);
+  updateSelectedProductsList();
+}
 
 /* Show initial placeholder until user selects a category */
 productsContainer.innerHTML = `
@@ -42,6 +142,26 @@ productsContainer.innerHTML = `
     Select a category to view products
   </div>
 `;
+
+/* Initialize: Load saved products from localStorage */
+loadSelectedProductsFromStorage();
+
+/* Update UI with saved products */
+const initializeSavedProducts = async () => {
+  await loadProducts();
+  updateSelectedProductsList();
+};
+
+initializeSavedProducts();
+
+/* Initialize language - load from localStorage or default to English */
+const savedLanguage = localStorage.getItem("preferredLanguage") || "en";
+setLanguage(savedLanguage);
+
+/* Language button event listeners */
+enLangBtn.addEventListener("click", () => setLanguage("en"));
+arLangBtn.addEventListener("click", () => setLanguage("ar"));
+
 selectedProductsList.innerHTML = `
   <div class="selected-products-empty">No products selected yet</div>
 `;
@@ -103,6 +223,8 @@ function toggleProductSelection(productId) {
     selectedProductIds = [...selectedProductIds, productId];
   }
 
+  /* Save to localStorage */
+  saveSelectedProductsToStorage();
   renderCurrentProducts();
 }
 
@@ -200,17 +322,24 @@ document.addEventListener("keydown", (event) => {
 /* Filter and display products when category changes */
 categoryFilter.addEventListener("change", async (e) => {
   hasCategorySelection = true;
-  const products = await loadProducts();
-  const selectedCategory = e.target.value;
+  currentCategory = e.target.value;
+  await applyFilters();
+});
 
-  /* filter() creates a new array containing only products 
-     where the category matches what the user selected */
-  const filteredProducts = products.filter(
-    (product) => product.category === selectedCategory,
-  );
+/* Filter and display products when search query changes */
+productSearch.addEventListener("input", async (e) => {
+  currentSearchQuery = e.target.value;
 
-  displayProducts(filteredProducts);
-  updateSelectedProductsList();
+  /* If both search and category are empty, show placeholder */
+  if (!currentSearchQuery.trim() && !currentCategory) {
+    productsContainer.innerHTML = `
+      <div class="placeholder-message">Select a category to view products</div>
+    `;
+    updateSelectedProductsList();
+    return;
+  }
+
+  await applyFilters();
 });
 
 selectedProductsList.addEventListener("click", (event) => {
@@ -222,14 +351,52 @@ selectedProductsList.addEventListener("click", (event) => {
 
   const productId = Number(removeButton.dataset.removeId);
   selectedProductIds = selectedProductIds.filter((id) => id !== productId);
+  /* Save to localStorage */
+  saveSelectedProductsToStorage();
   renderCurrentProducts();
 });
 
-/* Chat form submission handler - placeholder for OpenAI integration */
-chatForm.addEventListener("submit", (e) => {
+/* Chat form submission handler for follow-up questions */
+chatForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  chatWindow.innerHTML = "Connect to the OpenAI API for a response!";
+  if (!routineGenerated) {
+    chatWindow.innerHTML = `
+      <div class="chat-message error">
+        Please generate a routine first before asking follow-up questions.
+      </div>
+    `;
+    return;
+  }
+
+  const userInput = document.getElementById("userInput");
+  const userMessage = userInput.value.trim();
+
+  if (!userMessage) {
+    return;
+  }
+
+  /* Clear input field */
+  userInput.value = "";
+
+  /* Display user message */
+  chatWindow.innerHTML += `
+    <div class="chat-message user-message">
+      <strong>You:</strong> ${userMessage}
+    </div>
+  `;
+
+  /* Add user message to conversation history */
+  conversationHistory.push({
+    role: "user",
+    content: userMessage,
+  });
+
+  /* Scroll to bottom */
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+
+  /* Get AI response */
+  await sendFollowUpQuestion(userMessage);
 });
 
 /* Helper function to get selected products with their details */
@@ -313,10 +480,38 @@ async function generateRoutineFromAI(selectedProducts) {
     const data = await response.json();
     const routineText = data.choices[0].message.content;
 
-    // Display the routine in chat window
+    /* Clear conversation history and start fresh */
+    conversationHistory = [];
+    routineGenerated = true;
+
+    /* Add system message and initial routine to conversation history */
+    conversationHistory.push({
+      role: "system",
+      content:
+        "You are a beauty and skincare expert. Provide clear, actionable advice about skincare, haircare, makeup, fragrance, and related beauty topics. Refer back to the routine you generated when answering follow-up questions.",
+    });
+
+    conversationHistory.push({
+      role: "user",
+      content: `I have selected the following products for my skincare/haircare routine:\n\n${selectedProducts
+        .map(
+          (product) =>
+            `- ${product.name} (${product.brand}) - Category: ${product.category}\n  Description: ${product.description}`,
+        )
+        .join(
+          "\n",
+        )}\n\nPlease create a detailed, personalized daily routine using these products. Include morning and evening routines, application order, timing, and tips for best results.`,
+    });
+
+    conversationHistory.push({
+      role: "assistant",
+      content: routineText,
+    });
+
+    /* Display the routine in chat window */
     chatWindow.innerHTML = `
-      <div class="chat-message routine">
-        <h3>Your Personalized Routine</h3>
+      <div class="chat-message ai-message">
+        <strong>AI Beauty Assistant:</strong>
         <div class="routine-content">${formatRoutineText(routineText)}</div>
       </div>
     `;
@@ -324,6 +519,76 @@ async function generateRoutineFromAI(selectedProducts) {
     chatWindow.innerHTML = `
       <div class="chat-message error">
         <strong>Error generating routine:</strong> ${error.message}
+      </div>
+    `;
+    console.error("Error:", error);
+  }
+}
+
+/* Helper function to send follow-up questions */
+async function sendFollowUpQuestion(userMessage) {
+  try {
+    /* Show loading message */
+    chatWindow.innerHTML += `
+      <div class="chat-message loading">
+        <i class="fa-solid fa-spinner fa-spin"></i> Thinking...
+      </div>
+    `;
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+
+    /* Call OpenAI API with conversation history */
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: conversationHistory,
+        temperature: 0.7,
+        max_tokens: 1000,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.error?.message || "Failed to get response from OpenAI API",
+      );
+    }
+
+    const data = await response.json();
+    const aiResponse = data.choices[0].message.content;
+
+    /* Add AI response to conversation history */
+    conversationHistory.push({
+      role: "assistant",
+      content: aiResponse,
+    });
+
+    /* Remove loading message and display AI response */
+    const loadingMessage = chatWindow.querySelector(".loading");
+    if (loadingMessage) {
+      loadingMessage.remove();
+    }
+
+    chatWindow.innerHTML += `
+      <div class="chat-message ai-message">
+        <strong>AI Beauty Assistant:</strong> ${aiResponse}
+      </div>
+    `;
+
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  } catch (error) {
+    const loadingMessage = chatWindow.querySelector(".loading");
+    if (loadingMessage) {
+      loadingMessage.remove();
+    }
+
+    chatWindow.innerHTML += `
+      <div class="chat-message error">
+        <strong>Error:</strong> ${error.message}
       </div>
     `;
     console.error("Error:", error);
@@ -366,4 +631,38 @@ generateRoutineButton.addEventListener("click", async () => {
   }
 
   await generateRoutineFromAI(selectedProducts);
+});
+
+/* Clear All button click handler */
+const clearAllBtn = document.getElementById("clearAllBtn");
+clearAllBtn.addEventListener("click", () => {
+  if (selectedProductIds.length === 0) {
+    return;
+  }
+
+  openConfirmationModal();
+});
+
+/* Confirmation modal button handlers */
+confirmYesBtn.addEventListener("click", () => {
+  closeConfirmationModal();
+  clearAllSelectedProducts();
+});
+
+confirmNoBtn.addEventListener("click", () => {
+  closeConfirmationModal();
+});
+
+/* Close confirmation modal when clicking backdrop */
+const confirmationBackdrop = confirmationModal.querySelector(".modal-backdrop");
+confirmationBackdrop.addEventListener("click", closeConfirmationModal);
+
+/* Close confirmation modal when Escape key is pressed */
+document.addEventListener("keydown", (event) => {
+  if (
+    event.key === "Escape" &&
+    confirmationModal.classList.contains("active")
+  ) {
+    closeConfirmationModal();
+  }
 });
