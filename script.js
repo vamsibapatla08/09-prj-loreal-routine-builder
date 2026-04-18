@@ -119,7 +119,7 @@ function getAssistantText(data) {
 async function requestWorker(messages, maxTokens = 1000) {
   if (!isWorkerConfigured()) {
     throw new Error(
-      'Worker URL is missing. Add it in secrets.js as: const WORKER_URL = "https://your-worker.workers.dev";',
+      'Worker URL is missing. Add it in secrets.js as: const WORKER_URL = "https://late-leaf-b809.ravibapatla05usa.workers.dev/";',
     );
   }
 
