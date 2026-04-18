@@ -90,6 +90,64 @@ let currentCategory = "";
 /* localStorage key for saving selected products */
 const STORAGE_KEY = "selectedProductIds";
 const THEME_STORAGE_KEY = "preferredTheme";
+const WORKER_ENDPOINT =
+  typeof WORKER_URL !== "undefined" ? WORKER_URL.trim() : "";
+
+/* Check that the worker endpoint was set in secrets.js */
+function isWorkerConfigured() {
+  return WORKER_ENDPOINT !== "";
+}
+
+/* Read assistant text from common response formats */
+function getAssistantText(data) {
+  if (data?.choices?.[0]?.message?.content) {
+    return data.choices[0].message.content;
+  }
+
+  if (typeof data?.response === "string" && data.response.trim() !== "") {
+    return data.response;
+  }
+
+  if (typeof data?.content === "string" && data.content.trim() !== "") {
+    return data.content;
+  }
+
+  throw new Error("Worker returned an invalid response format.");
+}
+
+/* Send one chat completion request to your Cloudflare Worker */
+async function requestWorker(messages, maxTokens = 1000) {
+  if (!isWorkerConfigured()) {
+    throw new Error(
+      'Worker URL is missing. Add it in secrets.js as: const WORKER_URL = "https://your-worker.workers.dev";',
+    );
+  }
+
+  const response = await fetch(WORKER_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      messages,
+      temperature: 0.7,
+      max_tokens: maxTokens,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data?.error?.message ||
+        data?.message ||
+        "Worker request failed. Please check your worker setup.",
+    );
+  }
+
+  return getAssistantText(data);
+}
 
 /* Helper function to apply a visual theme and update button text/icon */
 function applyTheme(theme) {
@@ -465,12 +523,11 @@ function getSelectedProductsData() {
 /* Helper function to call OpenAI API and generate routine */
 async function generateRoutineFromAI(selectedProducts) {
   try {
-    // Get API key from secrets.js
-    if (!OPENAI_API_KEY || OPENAI_API_KEY === "your-api-key-here") {
+    if (!isWorkerConfigured()) {
       chatWindow.innerHTML = `
         <div class="chat-message error">
-          <strong>API Key Not Configured</strong><br>
-          Please add your OpenAI API key to the secrets.js file. Replace 'your-api-key-here' with your actual API key.
+          <strong>Worker URL Not Configured</strong><br>
+          Add your worker endpoint in secrets.js as: const WORKER_URL = "https://your-worker.workers.dev";
         </div>
       `;
       return;
@@ -493,41 +550,20 @@ async function generateRoutineFromAI(selectedProducts) {
 
     const userMessage = `I have selected the following products for my skincare/haircare routine:\n\n${productsList}\n\nPlease create a detailed, personalized daily routine using these products. Include morning and evening routines, application order, timing, and tips for best results.`;
 
-    // Call OpenAI API
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a beauty and skincare expert. Provide clear, actionable routine recommendations based on the user's selected products.",
-          },
-          {
-            role: "user",
-            content: userMessage,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 1500,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        errorData.error?.message ||
-          "Failed to generate routine from OpenAI API",
-      );
-    }
-
-    const data = await response.json();
-    const routineText = data.choices[0].message.content;
+    const routineText = await requestWorker(
+      [
+        {
+          role: "system",
+          content:
+            "You are a beauty and skincare expert. Provide clear, actionable routine recommendations based on the user's selected products.",
+        },
+        {
+          role: "user",
+          content: userMessage,
+        },
+      ],
+      1500,
+    );
 
     /* Clear conversation history and start fresh */
     conversationHistory = [];
@@ -585,30 +621,7 @@ async function sendFollowUpQuestion(userMessage) {
     `;
     chatWindow.scrollTop = chatWindow.scrollHeight;
 
-    /* Call OpenAI API with conversation history */
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: conversationHistory,
-        temperature: 0.7,
-        max_tokens: 1000,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        errorData.error?.message || "Failed to get response from OpenAI API",
-      );
-    }
-
-    const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
+    const aiResponse = await requestWorker(conversationHistory, 1000);
 
     /* Add AI response to conversation history */
     conversationHistory.push({
