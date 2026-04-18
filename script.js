@@ -6,21 +6,22 @@ const selectedProductsList = document.getElementById("selectedProductsList");
 const generateRoutineButton = document.getElementById("generateRoutine");
 const chatForm = document.getElementById("chatForm");
 const chatWindow = document.getElementById("chatWindow");
+const themeToggleButton = document.getElementById("themeToggleBtn");
 
-/* Language and RTL elements */
+/* Language and RTL elements 
 const htmlElement = document.getElementById("htmlElement");
 const enLangBtn = document.getElementById("enLangBtn");
-const arLangBtn = document.getElementById("arLangBtn");
+const arLangBtn = document.getElementById("arLangBtn");*/
 
-/* Helper function to set language and direction */
+/* Helper function to set language and direction 
 function setLanguage(lang) {
   const isRTL = lang === "ar";
 
-  /* Update HTML element */
+  
   htmlElement.lang = lang;
   htmlElement.dir = isRTL ? "rtl" : "ltr";
 
-  /* Update button states */
+  
   if (lang === "en") {
     enLangBtn.classList.add("active");
     arLangBtn.classList.remove("active");
@@ -29,9 +30,9 @@ function setLanguage(lang) {
     arLangBtn.classList.add("active");
   }
 
-  /* Save preference to localStorage */
+  
   localStorage.setItem("preferredLanguage", lang);
-}
+}*/
 
 /* Modal elements */
 const productModal = document.getElementById("productModal");
@@ -88,6 +89,38 @@ let currentCategory = "";
 
 /* localStorage key for saving selected products */
 const STORAGE_KEY = "selectedProductIds";
+const THEME_STORAGE_KEY = "preferredTheme";
+
+/* Helper function to apply a visual theme and update button text/icon */
+function applyTheme(theme) {
+  const selectedTheme = theme === "dark" ? "dark" : "light";
+  document.body.setAttribute("data-theme", selectedTheme);
+
+  if (!themeToggleButton) {
+    return;
+  }
+
+  if (selectedTheme === "dark") {
+    themeToggleButton.innerHTML =
+      '<i class="fa-solid fa-sun" aria-hidden="true"></i><span>Light Mode</span>';
+    themeToggleButton.setAttribute("aria-label", "Switch to light mode");
+    themeToggleButton.setAttribute("title", "Switch to light mode");
+    return;
+  }
+
+  themeToggleButton.innerHTML =
+    '<i class="fa-solid fa-moon" aria-hidden="true"></i><span>Dark Mode</span>';
+  themeToggleButton.setAttribute("aria-label", "Switch to dark mode");
+  themeToggleButton.setAttribute("title", "Switch to dark mode");
+}
+
+/* Toggle between dark and light themes and save preference */
+function toggleTheme() {
+  const currentTheme = document.body.getAttribute("data-theme") || "light";
+  const nextTheme = currentTheme === "dark" ? "light" : "dark";
+  applyTheme(nextTheme);
+  localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+}
 
 /* Helper functions for localStorage management */
 function saveSelectedProductsToStorage() {
@@ -154,13 +187,29 @@ const initializeSavedProducts = async () => {
 
 initializeSavedProducts();
 
+/* Initialize theme - load from localStorage or default to light */
+const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || "light";
+applyTheme(savedTheme);
+
+if (themeToggleButton) {
+  themeToggleButton.addEventListener("click", toggleTheme);
+}
+
 /* Initialize language - load from localStorage or default to English */
-const savedLanguage = localStorage.getItem("preferredLanguage") || "en";
-setLanguage(savedLanguage);
+if (typeof setLanguage === "function") {
+  const savedLanguage = localStorage.getItem("preferredLanguage") || "en";
+  setLanguage(savedLanguage);
+}
 
 /* Language button event listeners */
-enLangBtn.addEventListener("click", () => setLanguage("en"));
-arLangBtn.addEventListener("click", () => setLanguage("ar"));
+if (
+  typeof enLangBtn !== "undefined" &&
+  typeof arLangBtn !== "undefined" &&
+  typeof setLanguage === "function"
+) {
+  enLangBtn.addEventListener("click", () => setLanguage("en"));
+  arLangBtn.addEventListener("click", () => setLanguage("ar"));
+}
 
 selectedProductsList.innerHTML = `
   <div class="selected-products-empty">No products selected yet</div>
