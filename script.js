@@ -90,19 +90,20 @@ let currentCategory = "";
 /* localStorage key for saving selected products */
 const STORAGE_KEY = "selectedProductIds";
 const THEME_STORAGE_KEY = "preferredTheme";
-const WORKER_ENDPOINT = resolveWorkerEndpoint();
+const DEFAULT_WORKER_URL =
+  "https://late-leaf-b809.ravibapatla05usa.workers.dev/";
 
 /* Resolve and validate worker URL from global scope */
 function resolveWorkerEndpoint() {
   let rawUrl = "";
 
-  if (typeof WORKER_URL === "string") {
-    rawUrl = WORKER_URL;
-  } else if (
-    typeof window !== "undefined" &&
-    typeof window.WORKER_URL === "string"
-  ) {
+  // Prefer values attached to window, then script globals, then fallback.
+  if (typeof window !== "undefined" && typeof window.WORKER_URL === "string") {
     rawUrl = window.WORKER_URL;
+  } else if (typeof WORKER_URL === "string") {
+    rawUrl = WORKER_URL;
+  } else {
+    rawUrl = DEFAULT_WORKER_URL;
   }
 
   rawUrl = rawUrl.trim().replace(/^['\"]|['\"]$/g, "");
@@ -120,7 +121,7 @@ function resolveWorkerEndpoint() {
 
 /* Check that the worker endpoint was set in secrets.js */
 function isWorkerConfigured() {
-  return WORKER_ENDPOINT !== "";
+  return resolveWorkerEndpoint() !== "";
 }
 
 /* Read assistant text from common response formats */
@@ -142,13 +143,15 @@ function getAssistantText(data) {
 
 /* Send one chat completion request to your Cloudflare Worker */
 async function requestWorker(messages, maxTokens = 1000) {
-  if (!isWorkerConfigured()) {
+  const endpoint = resolveWorkerEndpoint();
+
+  if (!endpoint) {
     throw new Error(
-      'Worker URL is missing. Add it in secrets.js as: const WORKER_URL = "https://late-leaf-b809.ravibapatla05usa.workers.dev/";',
+      `Worker URL is missing or invalid. Set window.WORKER_URL in secrets.js or update DEFAULT_WORKER_URL in script.js.`,
     );
   }
 
-  const response = await fetch(WORKER_ENDPOINT, {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
