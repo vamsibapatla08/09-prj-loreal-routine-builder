@@ -210,8 +210,10 @@
         navigator.userLanguage ||
         "en";
       if (isRtlLanguage(lang)) {
+        document.documentElement.setAttribute("dir", "rtl");
         document.body.setAttribute("dir", "rtl");
       } else {
+        document.documentElement.setAttribute("dir", "ltr");
         document.body.setAttribute("dir", "ltr");
       }
     }
@@ -227,5 +229,4 @@
       });
     }
   </script>
-  
 </html>

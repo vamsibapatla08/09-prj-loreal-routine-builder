@@ -361,6 +361,7 @@ function displayProducts(products) {
       <div class="product-info">
         <h3>${product.name}</h3>
         <p>${product.brand}</p>
+        <button class="view-details-btn" type="button" data-detail-id="${product.id}">View Details</button>
       </div>
     </div>
   `,
@@ -369,11 +370,23 @@ function displayProducts(products) {
 }
 
 productsContainer.addEventListener("click", (event) => {
+  const detailsButton = event.target.closest(".view-details-btn");
+
+  if (detailsButton) {
+    const productId = Number(detailsButton.dataset.detailId);
+    const product = allProducts.find((p) => p.id === productId);
+    if (product) {
+      openProductModal(product);
+    }
+    return;
+  }
+
   const removeButton = event.target.closest(".remove-product-btn");
 
   if (removeButton) {
     const productId = Number(removeButton.dataset.removeId);
     selectedProductIds = selectedProductIds.filter((id) => id !== productId);
+    saveSelectedProductsToStorage();
     renderCurrentProducts();
     return;
   }
@@ -384,24 +397,16 @@ productsContainer.addEventListener("click", (event) => {
     return;
   }
 
-  /* Check if the click is on the image or product info area */
-  const clickedElement = event.target.closest("img, .product-info");
-
-  if (clickedElement) {
-    /* Open modal if clicked on image or product info */
-    const productId = Number(card.dataset.productId);
-    const product = allProducts.find((p) => p.id === productId);
-    if (product) {
-      openProductModal(product);
-    }
-  } else {
-    /* Toggle selection if clicked elsewhere on the card */
-    toggleProductSelection(Number(card.dataset.productId));
-  }
+  /* Toggle selection when clicking the card */
+  toggleProductSelection(Number(card.dataset.productId));
 });
 
 productsContainer.addEventListener("keydown", (event) => {
   if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+
+  if (event.target.closest(".view-details-btn")) {
     return;
   }
 
