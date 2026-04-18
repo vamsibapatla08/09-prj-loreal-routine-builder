@@ -90,8 +90,33 @@ let currentCategory = "";
 /* localStorage key for saving selected products */
 const STORAGE_KEY = "selectedProductIds";
 const THEME_STORAGE_KEY = "preferredTheme";
-const WORKER_ENDPOINT =
-  typeof WORKER_URL !== "undefined" ? WORKER_URL.trim() : "";
+const WORKER_ENDPOINT = resolveWorkerEndpoint();
+
+/* Resolve and validate worker URL from global scope */
+function resolveWorkerEndpoint() {
+  let rawUrl = "";
+
+  if (typeof WORKER_URL === "string") {
+    rawUrl = WORKER_URL;
+  } else if (
+    typeof window !== "undefined" &&
+    typeof window.WORKER_URL === "string"
+  ) {
+    rawUrl = window.WORKER_URL;
+  }
+
+  rawUrl = rawUrl.trim().replace(/^['\"]|['\"]$/g, "");
+
+  if (rawUrl === "") {
+    return "";
+  }
+
+  try {
+    return new URL(rawUrl).toString();
+  } catch {
+    return "";
+  }
+}
 
 /* Check that the worker endpoint was set in secrets.js */
 function isWorkerConfigured() {
@@ -136,7 +161,16 @@ async function requestWorker(messages, maxTokens = 1000) {
     }),
   });
 
-  const data = await response.json();
+  const responseText = await response.text();
+  let data = {};
+
+  try {
+    data = responseText ? JSON.parse(responseText) : {};
+  } catch {
+    throw new Error(
+      "Worker returned a non-JSON response. Check the worker URL and deployment.",
+    );
+  }
 
   if (!response.ok) {
     throw new Error(
@@ -503,7 +537,6 @@ chatForm.addEventListener("submit", async (e) => {
     role: "user",
     content: userMessage,
   });
-  
 
   /* Scroll to bottom */
   chatWindow.scrollTop = chatWindow.scrollHeight;
