@@ -503,6 +503,7 @@ chatForm.addEventListener("submit", async (e) => {
     role: "user",
     content: userMessage,
   });
+  
 
   /* Scroll to bottom */
   chatWindow.scrollTop = chatWindow.scrollHeight;
